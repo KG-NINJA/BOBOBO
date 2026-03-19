@@ -106,7 +106,7 @@
 <body>
   <div id="ui">
     <h1>HUMAN EMOTION AVATAR</h1>
-    <div class="sub">人型 / 関節ピボット / 感情モーション</div>
+    <div class="sub">人型 / 関節ピボット / 感情 + アニメ調フェイスモーション</div>
     <button id="tweet-btn" class="tweet-btn">Tweet Emotion 🐦</button>
   </div>
 
@@ -133,20 +133,21 @@
     };
 
     const EMOTION_CONFIGS = {
-      joy:       { body: 0xffee58, light: 0xffd54f, intensity: 70 },
-      sad:       { body: 0x7aa7d9, light: 0x4f7fbf, intensity: 28 },
-      anger:     { body: 0xff6b4a, light: 0xff3300, intensity: 90 },
-      surprise:  { body: 0xffffff, light: 0xffffff, intensity: 100 },
-      calm:      { body: 0xa8d8ff, light: 0x66bfff, intensity: 36 },
-      confusion: { body: 0xb39ddb, light: 0x8e6cff, intensity: 48 }
+      joy:       { body: 0xffee58, light: 0xffd54f, intensity: 70, face: 0x1a1a1a, cheek: 0xff9eb0 },
+      sad:       { body: 0x7aa7d9, light: 0x4f7fbf, intensity: 28, face: 0x12243d, cheek: 0x5b88bd },
+      anger:     { body: 0xff6b4a, light: 0xff3300, intensity: 90, face: 0x2a0b05, cheek: 0xff5533 },
+      surprise:  { body: 0xffffff, light: 0xffffff, intensity: 100, face: 0x111111, cheek: 0xffc1cf },
+      calm:      { body: 0xa8d8ff, light: 0x66bfff, intensity: 36, face: 0x122232, cheek: 0x89b9da },
+      confusion: { body: 0xb39ddb, light: 0x8e6cff, intensity: 48, face: 0x231633, cheek: 0xc29bdf }
     };
 
     let scene, camera, renderer, controls, clock;
     let character, bodyMat, emotionLight;
+    let leftEyeMat, rightEyeMat, browMat, mouthMat, cheekMat;
     let currentEmotion = 'calm';
     const bones = {};
     const base = {};
-    const tmpEuler = new THREE.Euler();
+    const face = {};
 
     init();
     animate();
@@ -292,6 +293,7 @@
       const nose = makeMesh(0.04, 0.04, 0.04);
       nose.position.set(0, 0.1, 0.12);
       head.add(nose);
+      createFaceRig(head);
 
       // shoulders
       const leftShoulder = makeJoint('leftShoulder', 0.28, 0.28, 0.0, chest);
@@ -344,11 +346,62 @@
       return mesh;
     }
 
+    function createFaceRig(head) {
+      leftEyeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.45, metalness: 0.08 });
+      rightEyeMat = leftEyeMat.clone();
+      browMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4, metalness: 0.08 });
+      mouthMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.35, metalness: 0.08 });
+      cheekMat = new THREE.MeshStandardMaterial({ color: 0xffa6bc, transparent: true, opacity: 0.15, roughness: 0.7 });
+
+      face.leftEyePivot = new THREE.Group();
+      face.leftEyePivot.position.set(0.062, 0.145, 0.11);
+      head.add(face.leftEyePivot);
+      face.leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.043, 0.031, 0.012), leftEyeMat);
+      face.leftEyePivot.add(face.leftEye);
+
+      face.rightEyePivot = new THREE.Group();
+      face.rightEyePivot.position.set(-0.062, 0.145, 0.11);
+      head.add(face.rightEyePivot);
+      face.rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.043, 0.031, 0.012), rightEyeMat);
+      face.rightEyePivot.add(face.rightEye);
+
+      face.leftBrowPivot = new THREE.Group();
+      face.leftBrowPivot.position.set(0.062, 0.195, 0.108);
+      head.add(face.leftBrowPivot);
+      face.leftBrow = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.012, 0.01), browMat);
+      face.leftBrowPivot.add(face.leftBrow);
+
+      face.rightBrowPivot = new THREE.Group();
+      face.rightBrowPivot.position.set(-0.062, 0.195, 0.108);
+      head.add(face.rightBrowPivot);
+      face.rightBrow = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.012, 0.01), browMat);
+      face.rightBrowPivot.add(face.rightBrow);
+
+      face.mouthPivot = new THREE.Group();
+      face.mouthPivot.position.set(0, 0.08, 0.112);
+      head.add(face.mouthPivot);
+      face.mouth = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.013, 0.012), mouthMat);
+      face.mouthPivot.add(face.mouth);
+
+      face.leftCheek = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.032, 0.008), cheekMat);
+      face.leftCheek.position.set(0.083, 0.105, 0.108);
+      head.add(face.leftCheek);
+      face.rightCheek = face.leftCheek.clone();
+      face.rightCheek.material = face.leftCheek.material.clone();
+      face.rightCheek.position.set(-0.083, 0.105, 0.108);
+      head.add(face.rightCheek);
+    }
+
     function updateEmotionStyle() {
       const cfg = EMOTION_CONFIGS[currentEmotion];
       bodyMat.color.setHex(cfg.body);
       emotionLight.color.setHex(cfg.light);
       emotionLight.intensity = cfg.intensity;
+      leftEyeMat.color.setHex(cfg.face);
+      rightEyeMat.color.setHex(cfg.face);
+      browMat.color.setHex(cfg.face);
+      mouthMat.color.setHex(cfg.face);
+      cheekMat.color.setHex(cfg.cheek);
     }
 
     function resetPose() {
@@ -360,6 +413,32 @@
       }
       character.position.set(0, 0, 0);
       character.rotation.set(0, 0, 0);
+      face.leftEye.scale.set(1, 1, 1);
+      face.rightEye.scale.set(1, 1, 1);
+      face.leftEyePivot.rotation.set(0, 0, 0);
+      face.rightEyePivot.rotation.set(0, 0, 0);
+      face.leftBrowPivot.rotation.set(0, 0, 0);
+      face.rightBrowPivot.rotation.set(0, 0, 0);
+      face.leftBrowPivot.position.y = 0.195;
+      face.rightBrowPivot.position.y = 0.195;
+      face.mouth.scale.set(1, 1, 1);
+      face.mouthPivot.position.y = 0.08;
+      face.leftCheek.scale.set(1, 1, 1);
+      face.rightCheek.scale.set(1, 1, 1);
+      face.leftCheek.material.opacity = 0.15;
+      face.rightCheek.material.opacity = 0.15;
+    }
+
+    function snap(v, power = 1.0) {
+      return Math.tanh(v * power);
+    }
+
+    // アニメ調の「溜め→一気に解放」感をつくるカーブ
+    function holdBurst(t, freq = 1.0, holdRatio = 0.72) {
+      const phase = (t * freq) % 1;
+      if (phase < holdRatio) return -1;
+      const k = (phase - holdRatio) / (1 - holdRatio);
+      return -1 + Math.sin(k * Math.PI) * 2;
     }
 
     function applyEmotionPose(t) {
@@ -368,15 +447,32 @@
 
       switch (currentEmotion) {
         case 'joy': {
-          character.position.y = a(s(t * 8.0)) * 0.28;
-          bones.chest.rotation.z = s(t * 8.0) * 0.08;
-          bones.leftShoulder.rotation.z = 2.2 + s(t * 14.0) * 0.35;
-          bones.rightShoulder.rotation.z = -2.2 - s(t * 14.0) * 0.35;
+          const hop = a(s(t * 7.4));
+          const punch = snap(s(t * 10.5), 2.3);
+          const burst = holdBurst(t, 2.4, 0.68);
+          character.position.y = hop * 0.33;
+          character.rotation.z = s(t * 7.4) * 0.05;
+          bones.chest.rotation.z = s(t * 7.4) * 0.13;
+          bones.chest.rotation.x = -0.08 + burst * 0.04;
+          bones.leftShoulder.rotation.z = 2.25 + s(t * 14.0) * 0.45;
+          bones.rightShoulder.rotation.z = -2.25 - s(t * 14.0) * 0.45;
           bones.leftElbow.rotation.x = -0.9;
           bones.rightElbow.rotation.x = -0.9;
-          bones.leftThigh.rotation.x = -a(s(t * 8.0)) * 0.25;
-          bones.rightThigh.rotation.x = -a(s(t * 8.0)) * 0.25;
-          bones.neck.rotation.x = -0.08;
+          bones.leftThigh.rotation.x = -hop * 0.30;
+          bones.rightThigh.rotation.x = -hop * 0.30;
+          bones.neck.rotation.x = -0.1 + punch * 0.05;
+          bones.head.rotation.z = s(t * 9.0) * 0.08;
+          face.leftEye.scale.y = 0.5 + hop * 0.3;
+          face.rightEye.scale.y = 0.5 + hop * 0.3;
+          face.mouth.scale.set(1.2, 1.4 + hop * 0.5, 1);
+          face.leftBrowPivot.position.y += 0.004 + hop * 0.01;
+          face.rightBrowPivot.position.y += 0.004 + hop * 0.01;
+          face.leftCheek.material.opacity = 0.40;
+          face.rightCheek.material.opacity = 0.40;
+          face.leftCheek.scale.set(1.2, 1.1, 1);
+          face.rightCheek.scale.set(1.2, 1.1, 1);
+          face.leftEyePivot.rotation.z = s(t * 11.0) * 0.08;
+          face.rightEyePivot.rotation.z = -s(t * 11.0) * 0.08;
           break;
         }
 
@@ -392,12 +488,27 @@
           bones.rightShoulder.rotation.z = -0.16;
           const breathe = 1.0 + s(t * 1.6) * 0.03;
           bones.chest.scale.set(1, breathe, 1);
+          face.leftEye.scale.y = 0.38 + s(t * 1.6) * 0.03;
+          face.rightEye.scale.y = 0.38 + s(t * 1.6) * 0.03;
+          face.mouth.scale.set(0.8, 0.7, 1);
+          face.mouthPivot.position.y -= 0.007;
+          face.leftBrowPivot.rotation.z = -0.25;
+          face.rightBrowPivot.rotation.z = 0.25;
+          face.leftBrowPivot.position.y -= 0.01;
+          face.rightBrowPivot.position.y -= 0.01;
+          face.leftCheek.material.opacity = 0.08;
+          face.rightCheek.material.opacity = 0.08;
           break;
         }
 
         case 'anger': {
-          character.position.x = s(t * 34.0) * 0.02;
-          bones.chest.rotation.y = s(t * 20.0) * 0.08;
+          const shake = snap(s(t * 32.0), 3.0);
+          const slam = holdBurst(t, 3.2, 0.75);
+          character.position.x = shake * 0.024;
+          character.position.z = a(shake) * 0.02;
+          character.rotation.y = shake * 0.05;
+          bones.chest.rotation.y = shake * 0.09;
+          bones.chest.rotation.x = 0.08 + slam * 0.06;
           bones.abdomen.rotation.x = -0.08;
           bones.neck.rotation.x = -0.12;
           bones.leftShoulder.rotation.x = -1.15;
@@ -408,12 +519,28 @@
           bones.rightUpperArm.rotation.z = -0.14;
           bones.leftThigh.rotation.x = 0.08;
           bones.rightThigh.rotation.x = 0.08;
+          bones.head.rotation.y = shake * 0.12;
+          face.leftEye.scale.y = 0.28;
+          face.rightEye.scale.y = 0.28;
+          face.leftBrowPivot.rotation.z = 0.34;
+          face.rightBrowPivot.rotation.z = -0.34;
+          face.leftBrowPivot.position.y -= 0.014;
+          face.rightBrowPivot.position.y -= 0.014;
+          face.mouth.scale.set(1.3, 0.65 + a(shake) * 0.2, 1);
+          face.mouthPivot.position.y -= 0.002;
+          face.leftCheek.material.opacity = 0.22 + a(shake) * 0.1;
+          face.rightCheek.material.opacity = 0.22 + a(shake) * 0.1;
+          bones.leftFoot.rotation.x = -0.08 - a(slam) * 0.08;
+          bones.rightFoot.rotation.x = -0.08 - a(slam) * 0.08;
           break;
         }
 
         case 'surprise': {
-          character.position.z = s(t * 10.0) * 0.06;
-          character.position.y = a(s(t * 10.0)) * 0.12;
+          const shock = a(s(t * 10.0));
+          const recoil = holdBurst(t, 2.0, 0.66);
+          character.position.z = s(t * 10.0) * 0.075;
+          character.position.y = shock * 0.15;
+          character.rotation.x = recoil * 0.04;
           bones.abdomen.rotation.x = -0.10;
           bones.neck.rotation.x = -0.32;
           bones.head.rotation.x = -0.14;
@@ -421,6 +548,18 @@
           bones.rightShoulder.rotation.z = -1.0;
           bones.leftElbow.rotation.x = -0.25;
           bones.rightElbow.rotation.x = -0.25;
+          face.leftEye.scale.y = 1.7 + shock * 0.6;
+          face.rightEye.scale.y = 1.7 + shock * 0.6;
+          face.leftEye.scale.x = 0.9;
+          face.rightEye.scale.x = 0.9;
+          face.leftBrowPivot.position.y += 0.02 + shock * 0.01;
+          face.rightBrowPivot.position.y += 0.02 + shock * 0.01;
+          face.mouth.scale.set(0.6, 2.2 + shock * 0.6, 1);
+          face.mouthPivot.position.y -= 0.01;
+          face.leftCheek.material.opacity = 0.16;
+          face.rightCheek.material.opacity = 0.16;
+          bones.leftShoulder.rotation.x = -0.22 + recoil * 0.08;
+          bones.rightShoulder.rotation.x = -0.22 + recoil * 0.08;
           break;
         }
 
@@ -432,18 +571,37 @@
           const breathe = 1.0 + s(t * 1.3) * 0.04;
           bones.chest.scale.set(breathe, breathe, breathe);
           bones.head.rotation.y = s(t * 1.0) * 0.05;
+          face.leftEye.scale.y = 0.8 + s(t * 1.3) * 0.05;
+          face.rightEye.scale.y = 0.8 + s(t * 1.3) * 0.05;
+          face.leftBrowPivot.rotation.z = s(t * 1.2) * 0.05;
+          face.rightBrowPivot.rotation.z = -s(t * 1.2) * 0.05;
+          face.mouth.scale.set(1.0, 0.9 + s(t * 1.3) * 0.03, 1);
+          face.leftCheek.material.opacity = 0.12;
+          face.rightCheek.material.opacity = 0.12;
           break;
         }
 
         case 'confusion': {
+          const wobble = holdBurst(t, 1.3, 0.62);
           bones.head.rotation.z = s(t * 2.8) * 0.32;
           bones.head.rotation.y = s(t * 1.7) * 0.12;
           bones.neck.rotation.z = s(t * 2.8) * 0.10;
+          bones.chest.rotation.y = s(t * 1.8) * 0.08 + wobble * 0.06;
           bones.rightShoulder.rotation.x = -1.45;
           bones.rightUpperArm.rotation.y = -0.95;
           bones.rightElbow.rotation.x = -1.15;
           bones.leftShoulder.rotation.z = 0.12;
           bones.leftElbow.rotation.x = -0.15;
+          face.leftEyePivot.rotation.z = s(t * 2.8) * 0.08;
+          face.rightEyePivot.rotation.z = -s(t * 2.8) * 0.08;
+          face.leftBrowPivot.rotation.z = -0.30 + s(t * 2.8) * 0.1;
+          face.rightBrowPivot.rotation.z = 0.18 - s(t * 2.8) * 0.1;
+          face.leftBrowPivot.position.y += 0.004;
+          face.rightBrowPivot.position.y -= 0.01;
+          face.mouth.scale.set(0.95, 0.72 + a(s(t * 2.8)) * 0.25, 1);
+          face.mouthPivot.position.y -= 0.003;
+          face.leftCheek.material.opacity = 0.2;
+          face.rightCheek.material.opacity = 0.09;
           break;
         }
       }
