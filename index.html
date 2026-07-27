@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Human Emotion Avatar | Three.js</title>
+  <title>BOBOBO | デジタル小動物PoC</title>
   <style>
     body {
       margin: 0;
@@ -92,6 +92,69 @@
       background: #1a8cd8;
       transform: scale(1.05);
     }
+    .utility-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .utility-btn {
+      padding: 7px 11px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      cursor: pointer;
+    }
+    #debug-panel {
+      position: fixed;
+      z-index: 30;
+      top: 12px;
+      right: 12px;
+      width: min(380px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      box-sizing: border-box;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      background: rgba(4,8,15,0.94);
+      font-size: 12px;
+    }
+    #debug-panel summary { cursor: pointer; font-weight: 700; }
+    #debug-panel:not([open]) { width: auto; }
+    .debug-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 5px 8px;
+      margin: 10px 0;
+    }
+    .debug-grid output { overflow-wrap: anywhere; color: #a8d8ff; }
+    #debug-panel label { display: grid; gap: 4px; }
+    #debug-panel input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 7px;
+      border-radius: 6px;
+      border: 1px solid #556;
+      background: #111826;
+      color: #fff;
+    }
+    .debug-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .debug-actions button { padding: 6px; }
+    #debug-message { min-height: 1.4em; margin-top: 7px; color: #ffd54f; }
+    @media (max-width: 640px) {
+      #ui { top: 10px; left: 10px; max-width: calc(100vw - 20px); }
+      #ui h1 { font-size: 16px; }
+      #controls {
+        right: 10px;
+        bottom: 54px;
+        grid-template-columns: repeat(6, 42px);
+        gap: 5px;
+      }
+      .btn { width: 42px; height: 42px; font-size: 20px; border-radius: 11px; }
+      #status { left: 10px; bottom: 10px; }
+    }
   </style>
 
   <script type="importmap">
@@ -105,9 +168,13 @@
 </head>
 <body>
   <div id="ui">
-    <h1>HUMAN EMOTION AVATAR</h1>
-    <div class="sub">人型 / 関節ピボット / 感情 + アニメ調フェイスモーション</div>
+    <h1>BOBOBO</h1>
+    <div class="sub">触れたり、そっと見守ったりしてみてください</div>
     <button id="tweet-btn" class="tweet-btn">Tweet Emotion 🐦</button>
+    <div class="utility-row">
+      <button id="microphone-start" class="utility-btn">音に反応する</button>
+      <button id="microphone-stop" class="utility-btn" hidden>マイク停止</button>
+    </div>
   </div>
 
   <div id="controls">
@@ -119,11 +186,15 @@
     <button class="btn" data-emotion="confusion" title="Confusion">❓</button>
   </div>
 
-  <div id="status">emotion: calm</div>
+  <div id="status" aria-live="polite">のんびりしている</div>
 
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CreatureController } from './src/creature-controller.js';
+    import { CreatureAiClient } from './src/ai-client.js';
+    import { STATE_LABELS, STATE_TO_EMOTION } from './src/creature-state.js';
+    import { createDebugPanel } from './src/debug-panel.js';
 
     const COLORS = {
       background: 0x050505,
@@ -145,9 +216,18 @@
     let character, bodyMat, emotionLight;
     let leftEyeMat, rightEyeMat, browMat, mouthMat, cheekMat;
     let currentEmotion = 'calm';
+    let pointerNdc = { x: 0, y: 0 };
+    let debugPanel = { update() {} };
+    let microphone = null;
+    let nextAiAt = Date.now() + 60_000 + Math.random() * 30_000;
     const bones = {};
     const base = {};
     const face = {};
+    const raycaster = new THREE.Raycaster();
+    const aiClient = new CreatureAiClient();
+    const creature = new CreatureController({
+      onChange: updateLifeDisplay
+    });
 
     init();
     animate();
@@ -164,6 +244,8 @@
       if (params.has('emotion')) {
         const emo = params.get('emotion');
         if (EMOTION_CONFIGS[emo]) currentEmotion = emo;
+      } else {
+        currentEmotion = creature.currentEmotion;
       }
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -204,6 +286,7 @@
       createCharacter();
       setupButtons();
       updateEmotionStyle();
+      setupCreatureLife();
 
       document.getElementById('tweet-btn').addEventListener('click', () => {
         const baseUrl = 'https://kg-ninja.github.io/BOBOBO/';
@@ -218,13 +301,18 @@
 
     function setupButtons() {
       const buttons = [...document.querySelectorAll('.btn')];
+      const emotionToState = {
+        joy: 'happy',
+        sad: 'lonely',
+        anger: 'annoyed',
+        surprise: 'startled',
+        calm: 'idle',
+        confusion: 'curious'
+      };
       buttons.forEach(btn => {
         btn.addEventListener('click', () => {
-          currentEmotion = btn.dataset.emotion;
-          updateEmotionStyle();
-          buttons.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          document.getElementById('status').textContent = `emotion: ${currentEmotion}`;
+          creature.addEvent('manual_emotion');
+          creature.transition(emotionToState[btn.dataset.emotion], 4000);
         });
         
         if (btn.dataset.emotion === currentEmotion) {
@@ -232,6 +320,132 @@
           document.getElementById('status').textContent = `emotion: ${currentEmotion}`;
         }
       });
+    }
+
+    function updateLifeDisplay(snapshot = creature.snapshot()) {
+      currentEmotion = STATE_TO_EMOTION[snapshot.currentState] || 'calm';
+      if (bodyMat) updateEmotionStyle();
+      document.querySelectorAll('.btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.emotion === currentEmotion);
+      });
+      const status = document.getElementById('status');
+      if (status) status.textContent = STATE_LABELS[snapshot.currentState] || 'のんびりしている';
+      debugPanel.update();
+    }
+
+    function setupCreatureLife() {
+      let pointerDown = null;
+      renderer.domElement.addEventListener('pointerdown', event => {
+        pointerDown = { x: event.clientX, y: event.clientY };
+      });
+      renderer.domElement.addEventListener('pointermove', event => {
+        pointerNdc = {
+          x: (event.clientX / window.innerWidth) * 2 - 1,
+          y: -(event.clientY / window.innerHeight) * 2 + 1
+        };
+        raycaster.setFromCamera(pointerNdc, camera);
+        const near = raycaster.intersectObject(character, true).length > 0;
+        creature.setPointer({ ...pointerNdc, near });
+      }, { passive: true });
+      renderer.domElement.addEventListener('pointerup', event => {
+        if (!pointerDown) return;
+        const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+        pointerDown = null;
+        if (moved > 12) return;
+        raycaster.setFromCamera({
+          x: (event.clientX / window.innerWidth) * 2 - 1,
+          y: -(event.clientY / window.innerHeight) * 2 + 1
+        }, camera);
+        if (raycaster.intersectObject(character, true).length) creature.handleTap();
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) creature.handleHidden();
+        else creature.handleVisible();
+      });
+      window.addEventListener('focus', () => {
+        if (!document.hidden) creature.handleVisible();
+      });
+      window.addEventListener('pagehide', () => creature.emit());
+
+      document.getElementById('microphone-start').addEventListener('click', startMicrophone);
+      document.getElementById('microphone-stop').addEventListener('click', stopMicrophone);
+
+      debugPanel = createDebugPanel({ controller: creature, aiClient, onRunAi: runAi });
+      updateLifeDisplay();
+      const previousVisitAge = Date.now() - creature.memory.lastVisitAt;
+      if (previousVisitAge > 10_000) {
+        creature.addEvent('page_revisit');
+        creature.handleVisible();
+      } else {
+        creature.addEvent('page_load');
+        creature.emit();
+      }
+
+      setInterval(() => {
+        if (!document.hidden) {
+          creature.tick();
+          if (Date.now() >= nextAiAt) {
+            runAi(false).catch(() => {});
+            nextAiAt = Date.now() + 60_000 + Math.random() * 30_000;
+          }
+        }
+      }, 5000);
+    }
+
+    async function runAi(manual = false) {
+      const result = await aiClient.decide(creature.snapshot(), { manual });
+      creature.applyDecision(result);
+      debugPanel.update();
+      return result;
+    }
+
+    async function startMicrophone() {
+      const startButton = document.getElementById('microphone-start');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        const context = new AudioContext();
+        const source = context.createMediaStreamSource(stream);
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        const samples = new Uint8Array(analyser.fftSize);
+        microphone = { stream, context, analyser, samples, active: true };
+        startButton.hidden = true;
+        document.getElementById('microphone-stop').hidden = false;
+        creature.addEvent('microphone_started');
+        creature.emit();
+        monitorVolume();
+      } catch {
+        creature.handleMicrophoneDenied();
+        startButton.textContent = 'マイクなしで遊ぶ';
+        startButton.disabled = true;
+      }
+    }
+
+    function monitorVolume() {
+      if (!microphone?.active) return;
+      microphone.analyser.getByteTimeDomainData(microphone.samples);
+      let sum = 0;
+      for (const value of microphone.samples) {
+        const normalized = (value - 128) / 128;
+        sum += normalized * normalized;
+      }
+      const rms = Math.sqrt(sum / microphone.samples.length);
+      if (rms > 0.18) creature.handleLoudSound(rms);
+      requestAnimationFrame(monitorVolume);
+    }
+
+    function stopMicrophone() {
+      if (!microphone) return;
+      microphone.active = false;
+      microphone.stream.getTracks().forEach(track => track.stop());
+      microphone.context.close();
+      microphone = null;
+      document.getElementById('microphone-start').hidden = false;
+      document.getElementById('microphone-stop').hidden = true;
+      creature.addEvent('microphone_stopped');
+      creature.emit();
     }
 
     function makeMaterial(color = COLORS.body) {
@@ -607,6 +821,37 @@
       }
     }
 
+    function applyCreatureStatePose(t) {
+      const state = creature.currentState;
+      if (state === 'sleeping') {
+        character.position.y -= 0.72;
+        character.rotation.z = Math.PI / 2;
+        bones.leftShoulder.rotation.z = 0.55;
+        bones.rightShoulder.rotation.z = -0.55;
+        bones.leftThigh.rotation.x = -0.5;
+        bones.rightThigh.rotation.x = 0.35;
+        face.leftEye.scale.y = 0.08;
+        face.rightEye.scale.y = 0.08;
+      } else if (state === 'sleepy') {
+        bones.head.rotation.x += 0.25 + Math.abs(Math.sin(t * 0.8)) * 0.12;
+        face.leftEye.scale.y *= 0.35;
+        face.rightEye.scale.y *= 0.35;
+      } else if (state === 'wandering') {
+        const step = Math.sin(t * 4);
+        character.position.x += Math.sin(t * 0.45) * 0.7;
+        character.rotation.y = Math.sin(t * 0.45) * 0.45;
+        bones.leftThigh.rotation.x = step * 0.35;
+        bones.rightThigh.rotation.x = -step * 0.35;
+        bones.leftShoulder.rotation.x = -step * 0.25;
+        bones.rightShoulder.rotation.x = step * 0.25;
+      } else if (state === 'watching' || state === 'curious') {
+        bones.head.rotation.y += pointerNdc.x * 0.42;
+        bones.head.rotation.x += -pointerNdc.y * 0.18;
+      } else if (state === 'lonely') {
+        bones.head.rotation.y += Math.sin(t * 0.7) * 0.16;
+      }
+    }
+
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
@@ -614,6 +859,7 @@
       const t = clock.getElapsedTime();
       resetPose();
       applyEmotionPose(t);
+      applyCreatureStatePose(t);
 
       renderer.render(scene, camera);
     }
