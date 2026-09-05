@@ -7,8 +7,10 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "dry-run": "wrangler deploy --dry-run",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc -p tsconfig.dance.json",
+    "check": "node scripts/check.mjs",
+    "test": "node --test test/*.test.js",
+    "serve": "node scripts/serve.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260727.1",

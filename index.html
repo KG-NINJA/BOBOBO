@@ -18,7 +18,7 @@
       left: 16px;
       z-index: 10;
       background: rgba(0,0,0,0.28);
-      padding: 12px 14px;
+      padding: 10px 14px;
       border-radius: 12px;
       backdrop-filter: blur(8px);
     }
@@ -26,6 +26,64 @@
       margin: 0 0 4px 0;
       font-size: 18px;
       font-weight: 700;
+    }
+    .title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+    .title-row h1 { margin: 0; }
+    .title-row .tweet-btn { margin-top: 0; padding: 5px 10px; font-size: 12px; }
+    #beat-indicator {
+      --beat-pulse: 0;
+      --beat-level: 0;
+      --beat-rgb: 145 158 173;
+      margin-top: 6px;
+      padding: 6px 10px;
+      border: 1px solid rgb(var(--beat-rgb) / 0.5);
+      border-radius: 10px;
+      background: #0c141a;
+      color: rgb(var(--beat-rgb));
+      box-sizing: border-box;
+    }
+    .beat-heading, .beat-title, .beat-readout { display: flex; align-items: center; gap: 6px; }
+    .beat-heading { justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+    .beat-title { font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .beat-readout { color: #d6e5ec; font-size: 10px; white-space: nowrap; }
+    #beat-level-value { color: #fff; font-size: 24px; font-weight: 800; line-height: 26px; font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+    #beat-level-meter { position: relative; height: 20px; overflow: hidden; border-radius: 3px; background: #23313a; }
+    .beat-meter-fill {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, #32dec0, #b8f56b 55%, #ffd166 78%, #ff8965);
+      clip-path: inset(0 calc(100% - var(--beat-level) * 100%) 0 0);
+    }
+    #beat-level-meter::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(90deg, transparent 0, transparent calc(5% - 2px), #0c141a calc(5% - 2px), #0c141a 5%);
+      pointer-events: none;
+    }
+    #beat-indicator[data-state="searching"] { --beat-rgb: 242 193 103; }
+    #beat-indicator[data-state="tracking"] { --beat-rgb: 106 232 214; }
+    .beat-lamp { position: relative; width: 20px; height: 20px; flex: 0 0 20px; }
+    .beat-core {
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      background: rgb(var(--beat-rgb));
+      opacity: calc(0.35 + var(--beat-pulse) * 0.65);
+      transform: scale(calc(1 + var(--beat-pulse) * 0.8));
+      box-shadow: 0 0 calc(2px + var(--beat-pulse) * 8px) rgb(var(--beat-rgb) / 0.65);
+    }
+    .beat-halo {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgb(var(--beat-rgb));
+      border-radius: 50%;
+      opacity: calc(var(--beat-pulse) * 0.7);
+      transform: scale(calc(1.6 - var(--beat-pulse) * 0.65));
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .beat-core { transform: none; }
+      .beat-halo { display: none; }
     }
     .sub {
       font-size: 12px;
@@ -95,7 +153,7 @@
     .utility-row {
       display: flex;
       gap: 8px;
-      margin-top: 10px;
+      margin-top: 6px;
       flex-wrap: wrap;
     }
     .utility-btn {
@@ -106,6 +164,25 @@
       color: #fff;
       cursor: pointer;
     }
+    .utility-btn[aria-pressed="true"] { border-color: #4da3ff; background: #174774; }
+    .utility-btn:disabled { opacity: 0.6; cursor: wait; }
+    #audio-status { margin-top: 8px; max-width: 320px; font-size: 12px; color: #a8d8ff; }
+    .audio-note { margin-top: 5px; font-size: 11px; color: #aaa; }
+    #dance-style {
+      position: absolute;
+      right: 20px;
+      bottom: 156px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 18px;
+      background: rgba(0,0,0,0.55);
+      font-size: 12px;
+    }
+    #dance-style .utility-btn { min-height: 36px; }
+    #dance-energetic[aria-pressed="true"] { border-color: #ffb05b; background: #733c13; }
     #debug-panel {
       position: fixed;
       z-index: 30;
@@ -144,7 +221,7 @@
     .debug-actions button { padding: 6px; }
     #debug-message { min-height: 1.4em; margin-top: 7px; color: #ffd54f; }
     @media (max-width: 640px) {
-      #ui { top: 10px; left: 10px; max-width: calc(100vw - 20px); }
+      #ui { top: 10px; left: 10px; max-width: calc(100vw - 20px); box-sizing: border-box; }
       #ui h1 { font-size: 16px; }
       #controls {
         right: 10px;
@@ -154,6 +231,7 @@
       }
       .btn { width: 42px; height: 42px; font-size: 20px; border-radius: 11px; }
       #status { left: 10px; bottom: 10px; }
+      #dance-style { right: 10px; bottom: 108px; }
     }
   </style>
 
@@ -168,13 +246,36 @@
 </head>
 <body>
   <div id="ui">
-    <h1>BOBOBO</h1>
+    <div class="title-row">
+      <h1>BOBOBO</h1>
+      <button id="tweet-btn" class="tweet-btn">Tweet Emotion 🐦</button>
+    </div>
     <div class="sub">触れたり、そっと見守ったりしてみてください</div>
-    <button id="tweet-btn" class="tweet-btn">Tweet Emotion 🐦</button>
+    <div id="beat-indicator" data-state="off" role="group" aria-label="ビート検出は停止中" title="検出した音の立ち上がりの強さを0〜100の相対値で表示します。音量のdB値ではありません。">
+      <div class="beat-heading">
+        <div class="beat-title">
+          <span class="beat-lamp" aria-hidden="true"><span class="beat-halo"></span><span class="beat-core"></span></span>
+          <span id="beat-label" aria-hidden="true">BEAT · 停止</span>
+        </div>
+        <div class="beat-readout" aria-hidden="true"><span>拍の強さ</span><output id="beat-level-value">0</output><span>/100</span></div>
+      </div>
+      <div id="beat-level-meter" role="meter" aria-label="拍の強さ（相対値）" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span class="beat-meter-fill" aria-hidden="true"></span>
+      </div>
+    </div>
     <div class="utility-row">
-      <button id="microphone-start" class="utility-btn">音に反応する</button>
+      <button id="microphone-start" class="utility-btn" aria-pressed="false">音に反応する</button>
+      <button id="music-start" class="utility-btn" aria-pressed="false">音楽でダンス</button>
       <button id="microphone-stop" class="utility-btn" hidden>マイク停止</button>
     </div>
+    <div id="audio-status" role="status" hidden></div>
+    <div class="audio-note">音声は端末内で解析します。保存・送信はしません。</div>
+  </div>
+
+  <div id="dance-style" role="group" aria-label="ダンスの強さ">
+    <span>ダンス</span>
+    <button id="dance-normal" class="utility-btn" aria-pressed="true">ふつう</button>
+    <button id="dance-energetic" class="utility-btn" aria-pressed="false" title="音楽ダンスでジャンプ・キック・腕振りを強めます">激しく</button>
   </div>
 
   <div id="controls">
@@ -195,6 +296,10 @@
     import { CreatureAiClient } from './src/ai-client.js';
     import { STATE_LABELS, STATE_TO_EMOTION } from './src/creature-state.js';
     import { createDebugPanel } from './src/debug-panel.js';
+    import { RhythmDetector } from './src/rhythm-detector.js';
+    import { DanceMotion, getDancePose } from './src/dance-motion.js';
+    import { MicrophoneInput } from './src/microphone-input.js';
+    import { getBeatIndicatorFrame, getBeatLevel } from './src/beat-indicator.js';
 
     const COLORS = {
       background: 0x050505,
@@ -218,7 +323,16 @@
     let currentEmotion = 'calm';
     let pointerNdc = { x: 0, y: 0 };
     let debugPanel = { update() {} };
-    let microphone = null;
+    const rhythmDetector = new RhythmDetector();
+    const danceMotion = new DanceMotion();
+    let rhythm = rhythmDetector.snapshot(0);
+    let danceFrame = { beats: 0, mix: 0, intensity: 0.3, energy: 0 };
+    let lastAudioUiAt = 0;
+    const beatIndicator = document.getElementById('beat-indicator');
+    const beatLabel = document.getElementById('beat-label');
+    const beatLevelValue = document.getElementById('beat-level-value');
+    const beatLevelMeter = document.getElementById('beat-level-meter');
+    const microphone = new MicrophoneInput({ onStatus: updateMicrophoneStatus });
     let nextAiAt = Date.now() + 60_000 + Math.random() * 30_000;
     const bones = {};
     const base = {};
@@ -323,13 +437,16 @@
     }
 
     function updateLifeDisplay(snapshot = creature.snapshot()) {
-      currentEmotion = STATE_TO_EMOTION[snapshot.currentState] || 'calm';
+      const dancing = danceFrame.mix > 0.02;
+      currentEmotion = dancing ? 'joy' : STATE_TO_EMOTION[snapshot.currentState] || 'calm';
       if (bodyMat) updateEmotionStyle();
       document.querySelectorAll('.btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.emotion === currentEmotion);
       });
       const status = document.getElementById('status');
-      if (status) status.textContent = STATE_LABELS[snapshot.currentState] || 'のんびりしている';
+      if (status) status.textContent = dancing
+        ? (danceMotion.energetic ? '全力でダンスしている' : 'リズムにのっている')
+        : STATE_LABELS[snapshot.currentState] || 'のんびりしている';
       debugPanel.update();
     }
 
@@ -360,16 +477,29 @@
       });
 
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden) creature.handleHidden();
+        if (document.hidden) {
+          stopMicrophone();
+          creature.handleHidden();
+        }
         else creature.handleVisible();
       });
       window.addEventListener('focus', () => {
         if (!document.hidden) creature.handleVisible();
       });
-      window.addEventListener('pagehide', () => creature.emit());
+      window.addEventListener('pagehide', () => { stopMicrophone(); creature.emit(); });
 
-      document.getElementById('microphone-start').addEventListener('click', startMicrophone);
+      document.getElementById('microphone-start').addEventListener('click', () => microphone.start('sound'));
+      document.getElementById('music-start').addEventListener('click', () => microphone.start('music'));
       document.getElementById('microphone-stop').addEventListener('click', stopMicrophone);
+      for (const [id, energetic] of [['dance-normal', false], ['dance-energetic', true]]) {
+        document.getElementById(id).addEventListener('click', () => {
+          danceMotion.setEnergetic(energetic);
+          document.getElementById('dance-normal').setAttribute('aria-pressed', String(!energetic));
+          document.getElementById('dance-energetic').setAttribute('aria-pressed', String(energetic));
+          updateAudioReadout();
+          updateLifeDisplay();
+        });
+      }
 
       debugPanel = createDebugPanel({ controller: creature, aiClient, onRunAi: runAi });
       updateLifeDisplay();
@@ -400,52 +530,91 @@
       return result;
     }
 
-    async function startMicrophone() {
-      const startButton = document.getElementById('microphone-start');
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        const context = new AudioContext();
-        const source = context.createMediaStreamSource(stream);
-        const analyser = context.createAnalyser();
-        analyser.fftSize = 512;
-        source.connect(analyser);
-        const samples = new Uint8Array(analyser.fftSize);
-        microphone = { stream, context, analyser, samples, active: true };
-        startButton.hidden = true;
-        document.getElementById('microphone-stop').hidden = false;
+    function updateMicrophoneStatus(status, mode) {
+      rhythmDetector.reset();
+      rhythm = rhythmDetector.snapshot(0);
+      const pending = status === 'requesting';
+      const listening = status === 'listening';
+      for (const [id, buttonMode] of [['microphone-start', 'sound'], ['music-start', 'music']]) {
+        const button = document.getElementById(id);
+        button.disabled = pending;
+        button.setAttribute('aria-pressed', String(listening && mode === buttonMode));
+      }
+      document.getElementById('microphone-stop').hidden = !(pending || listening);
+      const messages = {
+        idle: 'マイクを停止しました',
+        requesting: 'マイクの許可を待っています（停止でキャンセル）',
+        denied: 'マイクが許可されませんでした。設定を確認して再試行できます。',
+        unavailable: 'マイクが見つかりません。接続して再試行してください。',
+        interrupted: 'マイクが中断されました。ボタンを押すと再開できます。',
+        error: 'マイクを開始できませんでした。HTTPSまたはlocalhostで再試行してください。',
+      };
+      const output = document.getElementById('audio-status');
+      output.hidden = false;
+      output.textContent = messages[status] || '';
+      if (listening) {
         creature.addEvent('microphone_started');
         creature.emit();
-        monitorVolume();
-      } catch {
-        creature.handleMicrophoneDenied();
-        startButton.textContent = 'マイクなしで遊ぶ';
-        startButton.disabled = true;
+        updateAudioReadout();
+      } else if (status === 'denied') creature.handleMicrophoneDenied();
+      updateBeatIndicator(performance.now()); // Clear immediately even when a hidden tab stops rendering.
+      updateLifeDisplay();
+    }
+
+    function updateBeatIndicator(now) {
+      const listening = microphone.status === 'listening' && microphone.mode === 'music';
+      const frame = getBeatIndicatorFrame(listening ? rhythm : null, rhythmDetector.lastOnset, now);
+      if (beatIndicator.dataset.state !== frame.state) {
+        const labels = {
+          off: ['停止', 'ビート検出は停止中'],
+          searching: ['探索中', '音楽のビートを探索中'],
+          tracking: ['検出中', '音楽のビートを検出中'],
+        };
+        beatIndicator.dataset.state = frame.state;
+        beatLabel.textContent = `BEAT · ${labels[frame.state][0]}`;
+        beatIndicator.setAttribute('aria-label', labels[frame.state][1]);
+      }
+      const pulse = frame.pulse.toFixed(3);
+      if (beatIndicator.style.getPropertyValue('--beat-pulse') !== pulse) {
+        beatIndicator.style.setProperty('--beat-pulse', pulse);
+      }
+      const level = getBeatLevel(rhythmDetector.onsets.at(-1)?.strength || 0, frame.pulse);
+      const value = String(level);
+      if (beatLevelValue.textContent !== value) {
+        beatLevelValue.textContent = value;
+        beatLevelMeter.setAttribute('aria-valuenow', value);
+        beatIndicator.style.setProperty('--beat-level', String(level / 100));
       }
     }
 
-    function monitorVolume() {
-      if (!microphone?.active) return;
-      microphone.analyser.getByteTimeDomainData(microphone.samples);
-      let sum = 0;
-      for (const value of microphone.samples) {
-        const normalized = (value - 128) / 128;
-        sum += normalized * normalized;
-      }
-      const rms = Math.sqrt(sum / microphone.samples.length);
-      if (rms > 0.18) creature.handleLoudSound(rms);
-      requestAnimationFrame(monitorVolume);
+    function updateAudioReadout() {
+      if (microphone.status !== 'listening') return;
+      const output = document.getElementById('audio-status');
+      const text = microphone.mode === 'sound' ? '音量に反応しています'
+        : rhythm.active ? `約${rhythm.bpm} BPM · ${danceMotion.energetic ? '激しくダンス中' : '音楽に合わせてダンス中'}`
+        : '拍を探しています · スピーカーで音楽を流してください';
+      if (output.textContent !== text) output.textContent = text;
     }
 
     function stopMicrophone() {
-      if (!microphone) return;
-      microphone.active = false;
-      microphone.stream.getTracks().forEach(track => track.stop());
-      microphone.context.close();
-      microphone = null;
-      document.getElementById('microphone-start').hidden = false;
-      document.getElementById('microphone-stop').hidden = true;
+      if (microphone.status !== 'listening' && microphone.status !== 'requesting') return;
+      microphone.stop();
       creature.addEvent('microphone_stopped');
       creature.emit();
+    }
+
+    function updateAudio(now) {
+      const frame = microphone.sample(now);
+      if (frame) {
+        if (microphone.mode === 'music') {
+          rhythm = rhythmDetector.update(frame.spectrum, frame.rms, frame.sampleRate, now);
+        } else if (frame.rms > 0.18) creature.handleLoudSound(frame.rms);
+      }
+      const wasDancing = danceFrame.mix > 0.02;
+      danceFrame = danceMotion.update(microphone.mode === 'music' ? rhythm : null, now);
+      updateBeatIndicator(now);
+      if (wasDancing !== (danceFrame.mix > 0.02)) updateLifeDisplay();
+      if (now - lastAudioUiAt >= 250) { updateAudioReadout(); lastAudioUiAt = now; }
     }
 
     function makeMaterial(color = COLORS.body) {
@@ -659,7 +828,8 @@
       const s = Math.sin;
       const a = Math.abs;
 
-      switch (currentEmotion) {
+      // The dance's display color must not switch the pose we are blending from.
+      switch (creature.currentEmotion) {
         case 'joy': {
           const hop = a(s(t * 7.4));
           const punch = snap(s(t * 10.5), 2.3);
@@ -855,13 +1025,41 @@
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
+      updateAudio(performance.now());
 
       const t = clock.getElapsedTime();
       resetPose();
       applyEmotionPose(t);
       applyCreatureStatePose(t);
+      applyMusicDance();
+
+      // Give the larger jumps and arm sweeps room without changing the orbit target.
+      const danceZoom = 1 - danceFrame.energy * danceFrame.mix * (camera.aspect < 0.9 ? 0.24 : 0.12);
+      if (Math.abs(camera.zoom - danceZoom) > 0.0001) {
+        camera.zoom = danceZoom;
+        camera.updateProjectionMatrix();
+      }
 
       renderer.render(scene, camera);
+    }
+
+    function applyMusicDance() {
+      if (!danceFrame.mix) return;
+      const pose = getDancePose(danceFrame.beats, danceFrame.intensity, danceFrame.energy);
+      const mix = danceFrame.mix;
+      const blend = (current, target) => THREE.MathUtils.lerp(current, target, mix);
+      character.position.set(blend(character.position.x, pose.x), blend(character.position.y, pose.y), blend(character.position.z, 0));
+      character.rotation.set(blend(character.rotation.x, 0), blend(character.rotation.y, pose.yaw), blend(character.rotation.z, pose.roll));
+      for (const [name, bone] of Object.entries(bones)) {
+        const origin = base[name];
+        const rotation = pose.rotations[name] || [0, 0, 0];
+        bone.rotation.set(blend(bone.rotation.x, rotation[0]), blend(bone.rotation.y, rotation[1]), blend(bone.rotation.z, rotation[2]));
+        bone.position.set(blend(bone.position.x, origin.px), blend(bone.position.y, origin.py), blend(bone.position.z, origin.pz));
+        bone.scale.set(blend(bone.scale.x, 1), blend(bone.scale.y, 1), blend(bone.scale.z, 1));
+      }
+      face.leftEye.scale.y = blend(face.leftEye.scale.y, 0.6);
+      face.rightEye.scale.y = blend(face.rightEye.scale.y, 0.6);
+      face.mouth.scale.y = blend(face.mouth.scale.y, 1.3);
     }
 
     function onResize() {
