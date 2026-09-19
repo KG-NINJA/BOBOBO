@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BOBOBO Life — Lifelike Avatar</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#071018;color:#e8f6ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 30%,#143345,#071018 68%)}
+main{width:min(980px,100%);margin:auto;padding:20px;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px}
+.stage{position:relative;min-height:72vh;border:1px solid #315063;border-radius:24px;overflow:hidden;background:linear-gradient(180deg,#102735,#09141d)}
+canvas{width:100%;height:72vh;display:block;touch-action:none}
+.panel{border:1px solid #315063;border-radius:20px;padding:16px;background:#0c1c27d9;align-self:start}
+h1{font-size:20px;margin:0 0 6px}.muted{opacity:.68;font-size:12px;line-height:1.5}.row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #ffffff12;font-size:13px}
+button{width:100%;margin-top:12px;border:0;border-radius:12px;padding:10px;background:#b7f3e8;color:#08201f;font-weight:800;cursor:pointer}
+.badge{position:absolute;left:14px;top:14px;font-size:11px;padding:6px 9px;border-radius:999px;background:#071018aa;border:1px solid #ffffff22}
+@media(max-width:760px){main{grid-template-columns:1fr;padding:10px}.stage,canvas{min-height:65vh;height:65vh}.panel{margin-bottom:18px}}
+</style>
+</head>
+<body>
+<main>
+<section class="stage">
+  <div class="badge">BIOLOGICAL REACTION PROTOTYPE</div>
+  <canvas id="life" aria-label="生き物的反応をするアバター"></canvas>
+</section>
+<aside class="panel">
+  <h1>BOBOBO Life</h1>
+  <p class="muted">ポインターへの慣れ、驚き、好奇心、疲労、ストレスを内部状態として持ち、同じ刺激でも毎回まったく同じ反応にはなりません。</p>
+  <div id="stats"></div>
+  <button id="tap">触れる</button>
+  <button id="reset">状態をリセット</button>
+  <p class="muted">この版の行動選択はローカルです。Jevは後から高次行動選択へ差し替えられる構造です。</p>
+</aside>
+</main>
+<script type="module">
+import { LifelikeAvatar } from "./src/lifelike-avatar.js";
+const canvas = document.querySelector("#life");
+let avatar = new LifelikeAvatar(canvas);
+avatar.start();
+
+const move = event => {
+  const p = event.touches?.[0] ?? event;
+  if (p) avatar.pointerMove(p.clientX, p.clientY);
+};
+canvas.addEventListener("pointermove", move);
+canvas.addEventListener("pointerdown", event => { move(event); avatar.tap(); });
+canvas.addEventListener("touchmove", move, { passive:true });
+document.querySelector("#tap").addEventListener("click", () => avatar.tap());
+document.querySelector("#reset").addEventListener("click", () => {
+  avatar.stop();
+  avatar = new LifelikeAvatar(canvas);
+  avatar.start();
+});
+const stats = document.querySelector("#stats");
+setInterval(() => {
+  const s = avatar.snapshot();
+  stats.innerHTML = [
+    ["action", s.action],
+    ...Object.entries(s.needs).map(([k,v]) => [k, v.toFixed(2)]),
+    ["interactions", s.memory.interactionCount],
+  ].map(([k,v]) => `<div class="row"><span>${k}</span><strong>${v}</strong></div>`).join("");
+}, 200);
+</script>
+</body>
+</html>
